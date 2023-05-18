@@ -9,7 +9,7 @@ Gem::Specification.new do |spec|
   spec.email = ['burdettelamar@yahoo.com']
 
   spec.summary = 'Check links in RDoc output.'
-  spec.homepage = 'https://github.com/BurdetteLamar/rdoc_link_checker'
+  # spec.homepage = 'https://github.com/BurdetteLamar/rdoc_link_checker'
   spec.license = 'MIT'
   spec.required_ruby_version = '>= 3.2.0'
 
