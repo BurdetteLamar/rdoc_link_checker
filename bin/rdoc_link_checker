@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+
 require 'getoptlong'
 require_relative '../lib/rdoc_link_checker'
 
