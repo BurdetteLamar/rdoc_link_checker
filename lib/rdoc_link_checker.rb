@@ -333,10 +333,13 @@ EOT
     li = ul.add_element(Element.new('li'))
     li.text = 'Text: the text of the anchor element.'
     li = ul.add_element(Element.new('li'))
-    li.text = <<EOT
-Path: the URL or path of the link (not including the fragment).
-For an on-site link, an abbreviated path is given;
-for an off-site link, the full URL is given.
+    li.text = 'Path: the URL or path of the link (not including the fragment):'
+    ul2 = li.add_element(Element.new('ul'))
+    li2 = ul2.add_element(Element.new('li'))
+    li2.text = 'For an on-site link, an abbreviated path is given.'
+    li2 = ul2.add_element(Element.new('li'))
+    li2.text = <<EOT
+For an off-site link, the full URL is given.
 If the path is reddish, the page was not found.
 EOT
     li = ul.add_element(Element.new('li'))
