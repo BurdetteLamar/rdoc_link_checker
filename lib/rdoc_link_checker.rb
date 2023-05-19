@@ -11,14 +11,16 @@ class RDocLinkChecker
 
   include REXML
 
-  attr_accessor :html_dirpath, :onsite_only
+  attr_accessor :html_dirpath, :onsite_only, :no_toc
 
   def initialize(
     html_dirpath,
-    onsite_only: false
+    onsite_only: false,
+    no_toc: false
   )
     self.html_dirpath = html_dirpath
     self.onsite_only = onsite_only
+    self.no_toc = no_toc
     @pages = {}
     @counts = {
       source_pages: 0,
@@ -26,7 +28,7 @@ class RDocLinkChecker
       links_checked: 0,
       links_broken: 0,
     }
-    @verbose = true
+    @verbose = false
   end
 
   def check
@@ -50,7 +52,7 @@ class RDocLinkChecker
     paths = Find.find('.').select {|path| path.end_with?('.html') }
     # Remove leading './'.
     @source_paths = paths.map{|path| path.sub(%r[^\./], '')}
-    # Filter.
+    @source_paths.delete('table_of_contents.html') if no_toc
     if @verbose
       @source_paths.each_with_index do |source_path, i|
         puts '- %4d %s' % [i, source_path]
@@ -380,7 +382,7 @@ EOT
   def add_offsite_links(body)
     h2 = body.add_element(Element.new('h2'))
     h2.text = 'Off-Site Links by Source Page'
-    pages.each_pair do |path, page|
+    @pages.each_pair do |path, page|
       offsite_links = page.links.select do |link|
         RDocLinkChecker.offsite?(link.href)
       end
