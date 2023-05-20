@@ -188,14 +188,10 @@ class RDocLinkChecker
       if content_type_html?(response)
         doc = Nokogiri::HTML(response.body)
         target_page.gather_ids(doc)
-      else
-        unless exception
-          exception = RDocLinkChecker::HttpStatusCodeError.new(url, code)
-        end
       end
-      puts "End fetch target page #{url}" if @verbose
-      exception
     end
+    puts "End fetch target page #{url}" if @verbose
+    exception
   end
 
   # Returns whether the code is bad (zero or >= 400).
@@ -280,6 +276,7 @@ EOT
     [
       :html_dirpath,
       :onsite_only,
+      :no_toc
     ].each do |sym|
       value = send(sym).inspect
       row = {sym => :label, value => :good}
