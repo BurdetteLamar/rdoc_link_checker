@@ -11,20 +11,17 @@ class TestRDocLinkChecker < Minitest::Test
   def test_parameters
     [true, false].each do |onsite_only|
       [true, false].each do |no_toc|
+        exp_texts = [
+          ['Parameters'],
+          ["html_dirpath", "\"test/html\""],
+          ['onsite_only', onsite_only.to_s],
+          ['no_toc', no_toc.to_s],
+        ]
         doc = run_link_checker('test/html', onsite_only, no_toc)
-        rows = doc.at('table').search('tr')
-        row = rows.shift
-        texts = row.search('th, td').map { |cell| cell.text.strip }
-        assert_equal('Parameters', row.text.strip)
-        row = rows.shift
-        texts = row.search('th, td').map { |cell| cell.text.strip }
-        assert_equal(["html_dirpath", "\"test/html\""], texts)
-        row = rows.shift
-        texts = row.search('th, td').map { |cell| cell.text.strip }
-        assert_equal(['onsite_only', onsite_only.to_s], texts)
-        row = rows.shift
-        texts = row.search('th, td').map { |cell| cell.text.strip }
-        assert_equal(['no_toc', no_toc.to_s], texts)
+        doc.at('table').search('tr').each_with_index do |row, i|
+          texts = row.search('th, td').map { |cell| cell.text.strip }
+          assert_equal(exp_texts[i], texts)
+        end
       end
     end
 
