@@ -8,7 +8,7 @@ class TestRDocLinkChecker < Minitest::Test
     refute_nil ::RDocLinkChecker::VERSION
   end
 
-  def test_parameters
+  def test_parameters_table
     [true, false].each do |onsite_only|
       [true, false].each do |no_toc|
         exp_texts = [
@@ -18,7 +18,8 @@ class TestRDocLinkChecker < Minitest::Test
           ['no_toc', no_toc.to_s],
         ]
         doc = run_link_checker('test/html', onsite_only, no_toc)
-        doc.at('table').search('tr').each_with_index do |row, i|
+        table = doc.xpath('table[@id="parameters"]')
+        table.search('tr').each_with_index do |row, i|
           texts = row.search('th, td').map { |cell| cell.text.strip }
           assert_equal(exp_texts[i], texts)
         end
