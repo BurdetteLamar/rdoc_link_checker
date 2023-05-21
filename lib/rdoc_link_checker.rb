@@ -35,12 +35,12 @@ class RDocLinkChecker
     # All work is done in the HTML directory,
     # and that is where Report.htm will be put.
     Dir.chdir(html_dirpath) do |dir|
-      @counts[:start_time] = Time.now
+      @counts[:start_time] = Time.new
       gather_source_paths
       create_source_pages
       create_target_pages
       verify_links
-      @counts[:end_time] = Time.now
+      @counts[:end_time] = Time.new
       report
     end
   end
@@ -52,7 +52,6 @@ class RDocLinkChecker
     paths = Find.find('.').select {|path| path.end_with?('.html') }
     # Remove leading './'.
     @source_paths = paths.map{|path| path.sub(%r[^\./], '')}
-    @source_paths.delete('table_of_contents.html') if no_toc
     if @verbose
       @source_paths.each_with_index do |source_path, i|
         puts '- %4d %s' % [i, source_path]
@@ -73,7 +72,7 @@ class RDocLinkChecker
       @pages[source_path] = source_page
       source_text = File.read(source_path)
       doc = Nokogiri::HTML(source_text)
-      source_page.gather_links(doc)
+      source_page.gather_links(doc) unless no_toc
       source_page.gather_ids(doc)
       puts "Created source page #{progress_s}" if @verbose
     end
@@ -152,7 +151,7 @@ class RDocLinkChecker
             target_id = link.fragment
             link.valid_p = target_id.nil? || target_page.ids.include?(target_id)
           else
-            link_valid_p = false
+            link.valid_p = false
           end
         end
         link.puts(i) if @verbose
@@ -262,7 +261,7 @@ EOT
 
     add_summary(body)
     add_broken_links(body)
-    add_offsite_links(body) unless onsite_only
+    # add_offsite_links(body) unless onsite_only
     report_file_path = 'Report.htm' # _Not_ .html.
     doc.write(File.new(report_file_path, 'w'), 2)
   end
@@ -282,7 +281,7 @@ EOT
       row = {sym => :label, value => :good}
       data.push(row)
     end
-    table2(body, data, 'Parameters')
+    table2(body, data, 'parameters', 'Parameters')
     body.add_element(Element.new('p'))
 
     # Times table.
@@ -291,7 +290,7 @@ EOT
     minutes = (elapsed_time / 60) % 60
     hours = (elapsed_time/3600)
     elapsed_time_s = "%2.2d:%2.2d:%2.2d" % [hours, minutes, seconds]
-    format = "%Y-%m-%d-%a-%H:%M:%S"
+    format = "%Y-%m-%d-%a-%H:%M:%SZ"
     start_time_s = @counts[:start_time].strftime(format)
     end_time_s = @counts[:end_time].strftime(format)
     data = [
@@ -299,7 +298,7 @@ EOT
       {'End Time' => :label, end_time_s => :good},
       {'Elapsed Time' => :label, elapsed_time_s => :good},
     ]
-    table2(body, data, 'Times')
+    table2(body, data, 'times', 'Times')
     body.add_element(Element.new('p'))
 
     # Counts.
@@ -309,7 +308,7 @@ EOT
       {'Links Checked' => :label, @counts[:links_checked] => :good},
       {'Links Broken' => :label, @counts[:links_broken] => :bad},
     ]
-    table2(body, data, 'Counts')
+    table2(body, data, 'counts', 'Counts')
     body.add_element(Element.new('p'))
 
   end
@@ -372,7 +371,8 @@ EOT
           data.push({'Exception' => :label, link.exception.class => :bad})
           data.push({'Message' => :label, link.exception.message => :bad})
         end
-        table2(body, data)
+        id = link.exception ? 'bad_url' : 'bad_fragment'
+        table2(body, data, id)
         body.add_element(Element.new('p'))
       end
     end
@@ -382,12 +382,14 @@ EOT
   def add_offsite_links(body)
     h2 = body.add_element(Element.new('h2'))
     h2.text = 'Off-Site Links by Source Page'
+    none = true
     @pages.each_pair do |path, page|
       offsite_links = page.links.select do |link|
         RDocLinkChecker.offsite?(link.href)
       end
       next if offsite_links.empty?
 
+      none = false
       h3 = body.add_element(Element.new('h3'))
       a = Element.new('a')
       a.text = path
@@ -407,6 +409,10 @@ EOT
         body.add_element(Element.new('p'))
       end
     end
+    if none
+      p = body.add_element(Element.new('p'))
+      p.text = 'None.'
+    end
   end
 
   Classes = {
@@ -416,9 +422,10 @@ EOT
     bad: 'data center bad',
   }
 
-  def table2(parent, data, title = nil)
+  def table2(parent, data, id, title = nil)
     data = data.dup
     table = parent.add_element(Element.new('table'))
+    table.add_attribute('id', id)
     if title
       tr = table.add_element(Element.new('tr)'))
       th = tr.add_element(Element.new('th'))
