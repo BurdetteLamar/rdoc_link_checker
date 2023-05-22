@@ -323,6 +323,7 @@ EOT
       return
     end
 
+    # Legend.
     ul = body.add_element(Element.new('ul'))
     li = ul.add_element(Element.new('li'))
     li.text = 'Href: the href of the anchor element.'
@@ -348,13 +349,19 @@ EOT
       broken_links = page.links.select {|link| !link.valid_p }
       next if broken_links.empty?
 
-      h3 = body.add_element(Element.new('h3'))
+      page_div = body.add_element(Element.new('div'))
+      page_div.add_attribute('class', 'broken_page')
+      page_div.add_attribute('path', path)
+      page_div.add_attribute('count', broken_links.count)
+      h3 = page_div.add_element(Element.new('h3'))
       a = Element.new('a')
-      a.text = path
+      a.text = "#{path} (#{broken_links.count})"
       a.add_attribute('href', path)
       h3.add_element(a)
 
       broken_links.each do |link|
+        link_div = page_div.add_element(Element.new('div'))
+        link_div.add_attribute('class', 'broken_link')
         data = []
         # Text, URL, fragment
         a = Element.new('a')
@@ -372,8 +379,8 @@ EOT
           data.push({'Message' => :label, link.exception.message => :bad})
         end
         id = link.exception ? 'bad_url' : 'bad_fragment'
-        table2(body, data, id)
-        body.add_element(Element.new('p'))
+        table2(link_div, data, id)
+        page_div.add_element(Element.new('p'))
       end
     end
 
