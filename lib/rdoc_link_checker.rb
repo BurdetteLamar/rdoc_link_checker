@@ -13,6 +13,8 @@ class RDocLinkChecker
 
   attr_accessor :html_dirpath, :onsite_only, :no_toc
 
+  attr_accessor :source_paths, :pages
+
   def initialize(
     html_dirpath,
     onsite_only: false,
@@ -21,7 +23,7 @@ class RDocLinkChecker
     self.html_dirpath = html_dirpath
     self.onsite_only = onsite_only
     self.no_toc = no_toc
-    @pages = {}
+    self.pages = {}
     @counts = {
       source_pages: 0,
       target_pages: 0,
@@ -51,32 +53,32 @@ class RDocLinkChecker
     puts 'Gathering source paths' if @verbose
     paths = Find.find('.').select {|path| path.end_with?('.html') }
     # Remove leading './'.
-    @source_paths = paths.map{|path| path.sub(%r[^\./], '')}
+    self.source_paths = paths.map{|path| path.sub(%r[^\./], '')}
     if @verbose
-      @source_paths.each_with_index do |source_path, i|
+      source_paths.each_with_index do |source_path, i|
         puts '- %4d %s' % [i, source_path]
       end
     end
-    @counts[:source_pages] = @source_paths.size
-    puts "Gathered #{@source_paths.size} source paths" if @verbose
+    @counts[:source_pages] = source_paths.size
+    puts "Gathered #{source_paths.size} source paths" if @verbose
   end
 
   # Create a source \Page object for each source path.
   # Gather its links and ids.
   def create_source_pages
-    puts "Creating #{@source_paths.size} source pages" if @verbose
-    @source_paths.sort.each_with_index do |source_path, i|
-      progress_s = RDocLinkChecker.progress_s(i + 1, @source_paths.size)
+    puts "Creating #{source_paths.size} source pages" if @verbose
+    source_paths.sort.each_with_index do |source_path, i|
+      progress_s = RDocLinkChecker.progress_s(i + 1, source_paths.size)
       puts "Creating source page #{source_path} #{progress_s}" if @verbose
-      source_page = Page.new(source_path, @verbose, @pages, @counts, onsite_only)
-      @pages[source_path] = source_page
+      source_page = Page.new(source_path, :source, @verbose, pages, @counts, onsite_only)
+      pages[source_path] = source_page
       source_text = File.read(source_path)
       doc = Nokogiri::HTML(source_text)
       source_page.gather_links(doc) unless no_toc
       source_page.gather_ids(doc)
       puts "Created source page #{progress_s}" if @verbose
     end
-    puts "Created #{@pages.size} source pages" if @verbose
+    puts "Created #{pages.size} source pages" if @verbose
   end
 
   # Create a target \Page object for each link
@@ -84,26 +86,26 @@ class RDocLinkChecker
   def create_target_pages
     doc = nil
     target_page_count = 0
-    @source_paths = @pages.keys
-    @source_paths.each do |source_path|
+    source_paths = pages.keys
+    source_paths.each do |source_path|
       # Need for relative links to work.
       dirname = File.dirname(source_path)
       Dir.chdir(dirname) do
-        source_page = @pages[source_path]
+        source_page = pages[source_path]
         puts "Creating target pages for #{source_page.links.size} links in #{source_path}" if @verbose
         source_page.links.each_with_index do |link, i|
           next if link.path.nil?
           link.puts(i) if @verbose
           target_path = link.real_path
-          if @pages[target_path]
+          if pages[target_path]
             puts "Page #{target_path} already created" if @verbose
-            target_page = @pages[target_path]
+            target_page = pages[target_path]
           else
             if File.readable?(link.path)
               puts "Creating target page #{target_path}" if @verbose
               target_page_count += 1
-              target_page = Page.new(target_path, @verbose, @pages, @counts, onsite_only)
-              @pages[target_path] = target_page
+              target_page = Page.new(target_path, :target, @verbose, pages, @counts, onsite_only)
+              pages[target_path] = target_page
               target_text = File.read(link.path)
               doc = Nokogiri::HTML(target_text)
               target_page.gather_ids(doc)
@@ -111,8 +113,8 @@ class RDocLinkChecker
             elsif RDocLinkChecker.checkable?(link.path)
               puts "Creating target page #{target_path}" if @verbose
               target_page_count += 1
-              target_page = Page.new(target_path, @verbose, @pages, @counts, onsite_only)
-              @pages[target_path] = target_page
+              target_page = Page.new(target_path, :target, @verbose, pages, @counts, onsite_only)
+              pages[target_path] = target_page
               puts "Created target page #{target_path}" if @verbose
               link.exception = fetch(link.path, target_page)
               link.valid_p = false if link.exception
@@ -135,7 +137,7 @@ class RDocLinkChecker
 
   # Verify that each link target exists.
   def verify_links
-    linking_pages = @pages.select do |path, page|
+    linking_pages = pages.select do |path, page|
       !page.links.empty?
     end
     puts "Checking links on #{linking_pages.size} pages" if @verbose
@@ -146,7 +148,7 @@ class RDocLinkChecker
       link_count += page.links.size
       page.links.each_with_index do |link, i|
         if link.valid_p.nil? # Don't disturb if already set to false.
-          target_page = @pages[link.real_path]
+          target_page = pages[link.real_path]
           if target_page
             target_id = link.fragment
             link.valid_p = target_id.nil? || target_page.ids.include?(target_id)
@@ -345,7 +347,7 @@ Fragment: the fragment of the link.
 If the fragment is reddish, fragment was not found.
 EOT
 
-    @pages.each_pair do |path, page|
+    pages.each_pair do |path, page|
       broken_links = page.links.select {|link| !link.valid_p }
       next if broken_links.empty?
 
@@ -390,7 +392,7 @@ EOT
     h2 = body.add_element(Element.new('h2'))
     h2.text = 'Off-Site Links by Source Page'
     none = true
-    @pages.each_pair do |path, page|
+    pages.each_pair do |path, page|
       offsite_links = page.links.select do |link|
         RDocLinkChecker.offsite?(link.href)
       end
@@ -515,8 +517,9 @@ EOT
     # - +pages+: hash of path/page pairs.
     # - +counts+: hash of counts.
     #
-    def initialize(path, verbose, pages, counts, onsite_only)
+    def initialize(path, type, verbose, pages, counts, onsite_only)
       self.path = path
+      self.type = type
       self.verbose = verbose
       self.pages = pages
       self.counts = counts
@@ -526,6 +529,15 @@ EOT
       self.ids = []
       self.dirname = File.dirname(path)
       self.dirname = self.dirname == '.' ? '' : dirname
+    end
+
+    def to_h
+      {
+        path: path,
+        type: type,
+        dirname: dirname,
+        code: code
+      }
     end
 
     # Gather links for the page:
@@ -641,7 +653,6 @@ EOT
     # - +text+: attribute text from anchor element.
     # - +dirname+: directory path of the linking page.
     #
-    # TODO: accept the anchor element, instead of its href and text.
     def initialize(href, text, dirname)
       self.href = href
       self.text = text
@@ -652,6 +663,13 @@ EOT
       self.valid_p = nil
       self.real_path = make_real_path(dirname, path)
       self.exception = nil
+    end
+
+    def to_h
+      {
+        href: href,
+        text: text,
+      }
     end
 
     # Return the real (not relative) path of the link.
