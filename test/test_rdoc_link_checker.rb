@@ -46,11 +46,15 @@ class TestRDocLinkChecker < Minitest::Test
 
     checker.create_target_pages
     assert_equal(15, checker.pages.size, 'Total page count')
-    # checker.pages.each_pair do |path, page|
-    #   next unless page.type == :target
-    #   assert_operator(0, :<, page.ids.size, 'Target page id count')
-    #   assert_operator(0, :==, page.links.size, 'Target page id count')
-    # end
+    target_pages = checker.pages.select {|path, page| page.type == :target}
+    assert_equal(11, target_pages.size)
+    target_pages.each_pair do |path, page|
+      assert_operator(0, :<=, page.ids.size, page.path)
+      assert_operator(0, :==, page.links.size, page.path)
+    end
+
+    checker.verify_links
+    checker.report
   end
 
   def zzz_test_parameters_table
