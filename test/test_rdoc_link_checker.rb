@@ -54,10 +54,35 @@ class TestRDocLinkChecker < Minitest::Test
     end
 
     checker.verify_links
-    checker.report
+    page_exp_hrefs = [
+      [
+        'https://nosuch.xyzzy',
+        'https://docs.ruby-lang.org/en/master/Array.html#xyzzy',
+      ],
+      [],
+      [
+        'A.html#label-H1',
+        'A.html#label-H2',
+        'A.html#label-H3',
+        'A.html#label-H4',
+        'A.html#label-H5',
+        'A.html#label-H6'
+      ],
+      []
+    ]
+    source_pages = checker.pages.select {|path, page| page.type == :source}
+    source_pages.each_pair do |path, page|
+      exp_hrefs = page_exp_hrefs.shift
+      broken_links = page.links.select {|link| !link.valid_p }
+      exp_hrefs.each_with_index do |exp_href, i|
+        broken_link = broken_links[i]
+        act_href = broken_link.href
+        assert_equal(exp_href, act_href, broken_link.path)
+      end
+    end
   end
 
-  def zzz_test_parameters_table
+  def test_parameters_table
     [true, false].each do |onsite_only|
       [true, false].each do |no_toc|
         exp_texts = [
@@ -76,7 +101,7 @@ class TestRDocLinkChecker < Minitest::Test
     end
   end
 
-  def zzz_test_times_table
+  def test_times_table
     exp_texts = [
       'Times',
       'Start Time',
@@ -93,24 +118,20 @@ class TestRDocLinkChecker < Minitest::Test
     end
   end
 
-  def zzz_test_counts_table
-    exp_texts = [
-      'Counts',
-      'Source Pages',
-      'Target Pages',
-      'Links Checked',
-      'Links Broken'
+  def test_counts_table
+    row_exp_texts = [
+      ['Counts'],
+      ['Source Pages', '4'],
+      ['Target Pages', '6'],
+      ['Links Checked', '62'],
+      ['Links Broken', '8']
     ]
     doc = run_link_checker('test/html')
     table = doc.xpath("//table[@id='counts']")
     table.search('tr').each_with_index do |row, i|
-      texts = row.search('th, td').map { |cell| cell.text.strip }
-      assert_equal(exp_texts[i], texts[0])
-      exp = i == 0 ? 1 : 2
-      assert_equal(exp, texts.size)
-      next if i == 0
-      count = Integer(texts[1])
-      assert_operator(count, :>=, 0)
+      exp_texts = row_exp_texts[i]
+      act_texts = row.search('th, td').map { |cell| cell.text.strip }
+      assert_equal(exp_texts, act_texts)
     end
   end
 
@@ -157,8 +178,6 @@ class TestRDocLinkChecker < Minitest::Test
         end
       end
     end
-    # table = doc.xpath("//table[@id='counts']")
-    # table.search('tr').each_with_index do |row, i|
 
   end
 
