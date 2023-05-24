@@ -30,7 +30,6 @@ class RDocLinkChecker
       links_checked: 0,
       links_broken: 0,
     }
-    @verbose = false
   end
 
   def check
@@ -50,35 +49,24 @@ class RDocLinkChecker
   # Gather paths to source HTML pages.
   def gather_source_paths
     paths = []
-    puts 'Gathering source paths' if @verbose
     paths = Find.find('.').select {|path| path.end_with?('.html') }
     # Remove leading './'.
     self.source_paths = paths.map{|path| path.sub(%r[^\./], '')}
-    if @verbose
-      source_paths.each_with_index do |source_path, i|
-        puts '- %4d %s' % [i, source_path]
-      end
-    end
     @counts[:source_pages] = source_paths.size
-    puts "Gathered #{source_paths.size} source paths" if @verbose
   end
 
   # Create a source \Page object for each source path.
   # Gather its links and ids.
   def create_source_pages
-    puts "Creating #{source_paths.size} source pages" if @verbose
     source_paths.sort.each_with_index do |source_path, i|
       progress_s = RDocLinkChecker.progress_s(i + 1, source_paths.size)
-      puts "Creating source page #{source_path} #{progress_s}" if @verbose
-      source_page = Page.new(source_path, :source, @verbose, pages, @counts, onsite_only)
+      source_page = Page.new(:source, source_path, onsite_only, pages: pages, counts: @counts)
       pages[source_path] = source_page
       source_text = File.read(source_path)
       doc = Nokogiri::HTML(source_text)
       source_page.gather_links(doc) unless no_toc
       source_page.gather_ids(doc)
-      puts "Created source page #{progress_s}" if @verbose
     end
-    puts "Created #{pages.size} source pages" if @verbose
   end
 
   # Create a target \Page object for each link
@@ -92,34 +80,24 @@ class RDocLinkChecker
       dirname = File.dirname(source_path)
       Dir.chdir(dirname) do
         source_page = pages[source_path]
-        puts "Creating target pages for #{source_page.links.size} links in #{source_path}" if @verbose
         source_page.links.each_with_index do |link, i|
           next if link.path.nil?
-          link.puts(i) if @verbose
           target_path = link.real_path
           if pages[target_path]
-            puts "Page #{target_path} already created" if @verbose
             target_page = pages[target_path]
           else
+            target_page_count += 1
+            target_page = Page.new(:target, target_path, onsite_only, pages: pages, counts: @counts)
+            pages[target_path] = target_page
             if File.readable?(link.path)
-              puts "Creating target page #{target_path}" if @verbose
-              target_page_count += 1
-              target_page = Page.new(target_path, :target, @verbose, pages, @counts, onsite_only)
-              pages[target_path] = target_page
               target_text = File.read(link.path)
               doc = Nokogiri::HTML(target_text)
               target_page.gather_ids(doc)
-              puts "Created target page #{target_path}" if @verbose
             elsif RDocLinkChecker.checkable?(link.path)
-              puts "Creating target page #{target_path}" if @verbose
-              target_page_count += 1
-              target_page = Page.new(target_path, :target, @verbose, pages, @counts, onsite_only)
-              pages[target_path] = target_page
-              puts "Created target page #{target_path}" if @verbose
               link.exception = fetch(link.path, target_page)
               link.valid_p = false if link.exception
             else
-              puts "File not readable or checkable: #{target_path}" if @verbose
+              # File not readable or checkable.
             end
           end
           next if target_page.nil?
@@ -128,10 +106,8 @@ class RDocLinkChecker
             target_page.gather_ids(doc)
           end
         end
-        puts "Created target pages for #{source_page.links.size} links in #{source_path}" if @verbose
       end
     end
-    puts "Created #{target_page_count} target pages" if @verbose
     @counts[:target_pages] = target_page_count
   end
 
@@ -140,11 +116,9 @@ class RDocLinkChecker
     linking_pages = pages.select do |path, page|
       !page.links.empty?
     end
-    puts "Checking links on #{linking_pages.size} pages" if @verbose
     link_count = 0
     broken_count = 0
     linking_pages.each_pair do |path, page|
-      puts "Checking #{page.links.size} links on page #{path}" if @verbose
       link_count += page.links.size
       page.links.each_with_index do |link, i|
         if link.valid_p.nil? # Don't disturb if already set to false.
@@ -156,12 +130,9 @@ class RDocLinkChecker
             link.valid_p = false
           end
         end
-        link.puts(i) if @verbose
         broken_count += 1 unless link.valid_p
       end
-      puts "Checked #{page.links.size} links on page #{path}" if @verbose
     end
-    puts "Checked #{link_count} links on #{linking_pages.size} pages" if @verbose
     @counts[:links_checked] = link_count
     @counts[:links_broken] = broken_count
   end
@@ -169,21 +140,16 @@ class RDocLinkChecker
   # Fetch the page from the web and gather its ids into the target page.
   # Returns exception or nil.
   def fetch(url, target_page)
-    puts "Begin fetch target page #{url}" if @verbose
-    puts "Getting return code for #{url}" if @verbose
     code = 0
     exception = nil
     begin
       response =  Net::HTTP.get_response(URI(url))
       code = response.code.to_i
       target_page.code = code
-      puts "Returned #{code} (#{response.class})" if @verbose
     rescue => x
-      puts "Raised #{x.class} #{x.message}" if @verbose
       raise unless x.class.name.match(/^(Net|SocketError|IO::TimeoutError|Errno::)/)
       exception = RDocLinkChecker::HttpResponseError.new(url, x)
     end
-    puts "Got return code #{code} for #{url} " if @verbose
     # Don't load if bad code, or no response, or if not html.
     if !code_bad?(code)
       if content_type_html?(response)
@@ -191,7 +157,6 @@ class RDocLinkChecker
         target_page.gather_ids(doc)
       end
     end
-    puts "End fetch target page #{url}" if @verbose
     exception
   end
 
@@ -507,20 +472,18 @@ EOT
   # Class to represent a page.
   class Page
 
-    attr_accessor :path, :type, :verbose, :pages, :counts, :code, :links, :ids, :dirname, :onsite_only
+    attr_accessor :path, :type, :pages, :counts, :code, :links, :ids, :dirname, :onsite_only
 
     # Returns a new \Page object:
     #
     # - +path+: a path relative to the HTML directory (if on-site)
     #   or a URL (if off-site).
-    # - +verbose+: whether to put progress message to $stdout.
     # - +pages+: hash of path/page pairs.
     # - +counts+: hash of counts.
     #
-    def initialize(path, type, verbose, pages, counts, onsite_only)
+    def initialize(type, path, onsite_only, pages: {}, counts: {})
       self.path = path
       self.type = type
-      self.verbose = verbose
       self.pages = pages
       self.counts = counts
       self.onsite_only = onsite_only
@@ -545,7 +508,6 @@ EOT
     # - +doc+: Nokogiri document to be parsed for links.
     #
     def gather_links(doc)
-      puts 'Gathering links' if @verbose
       i = 0
       # The links are in the anchors.
       doc.search('a').each do |a|
@@ -562,10 +524,8 @@ EOT
         next if link.path.nil? || link.path.empty?
 
         links.push(link)
-        link.puts(i) if @verbose
         i += 1
       end
-      puts "Gathered #{i} links" if @verbose
     end
 
     # Gather ids for the page.
@@ -596,7 +556,6 @@ EOT
       # - h*
       #
       # We can add more as needed (i.e., if/when we have actual broken links).
-      puts 'Gathering potential link targets' if @verbose
 
       # body element has 'top', which is a link target.
       body = doc.at('//body')
@@ -631,13 +590,6 @@ EOT
           ids.push(id) if id
         end
       end
-      if @verbose
-        ids.each_with_index do |id, i|
-          puts '%4d %s' % [i, id]
-        end
-      end
-      puts "Gathered #{ids.size} potential link targets" if @verbose
-
     end
 
   end
