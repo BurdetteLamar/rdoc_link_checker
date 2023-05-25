@@ -64,7 +64,11 @@ class RDocLinkChecker
       pages[source_path] = source_page
       source_text = File.read(source_path)
       doc = Nokogiri::HTML(source_text)
-      source_page.gather_links(doc) unless no_toc
+      if source_path == 'table_of_contents.html'
+        source_page.gather_links(doc) unless no_toc
+      else
+        source_page.gather_links(doc)
+      end
       source_page.gather_ids(doc)
     end
   end
