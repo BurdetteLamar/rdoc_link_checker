@@ -59,9 +59,9 @@ class RDocLinkChecker
   # Gather its links and ids.
   def create_source_pages
     source_paths.sort.each_with_index do |source_path, i|
-      progress_s = RDocLinkChecker.progress_s(i + 1, source_paths.size)
       source_page = Page.new(:source, source_path, onsite_only, pages: pages, counts: @counts)
       pages[source_path] = source_page
+      source_page.content_type = 'text/html'
       source_text = File.read(source_path)
       doc = Nokogiri::HTML(source_text)
       if source_path == 'table_of_contents.html'
@@ -107,7 +107,7 @@ class RDocLinkChecker
           next if target_page.nil?
           if link.has_fragment? && target_page.ids.empty?
             doc || doc = Nokogiri::HTML(target_text)
-            target_page.gather_ids(doc)
+            target_page.gather_ids(doc) if target_page.content_type&.match('html')
           end
         end
       end
@@ -129,7 +129,9 @@ class RDocLinkChecker
           target_page = pages[link.real_path]
           if target_page
             target_id = link.fragment
-            link.valid_p = target_id.nil? || target_page.ids.include?(target_id)
+            link.valid_p = target_id.nil? ||
+              target_page.ids.include?(target_id) ||
+              !target_page.content_type&.match('html')
           else
             link.valid_p = false
           end
@@ -150,6 +152,7 @@ class RDocLinkChecker
       response =  Net::HTTP.get_response(URI(url))
       code = response.code.to_i
       target_page.code = code
+      target_page.content_type = response['Content-Type']
     rescue => x
       raise unless x.class.name.match(/^(Net|SocketError|IO::TimeoutError|Errno::)/)
       exception = RDocLinkChecker::HttpResponseError.new(url, x)
@@ -186,13 +189,6 @@ class RDocLinkChecker
   def self.get_fragment(s)
     a = s.split('#', 2)
     a.size == 2 ? a[1] : nil
-  end
-
-  # Returns a progress string giving a fraction and percentage.
-  def self.progress_s(i, total)
-    fraction_s = "#{i}/#{total}"
-    percent_i = (i*100.0/total).round
-    "(#{fraction_s}, #{percent_i}%)"
   end
 
   # Returns whether the path is checkable.
@@ -476,7 +472,8 @@ EOT
   # Class to represent a page.
   class Page
 
-    attr_accessor :path, :type, :pages, :counts, :code, :links, :ids, :dirname, :onsite_only
+    attr_accessor :path, :type, :pages, :counts, :code,
+                  :links, :ids, :dirname, :onsite_only, :content_type
 
     # Returns a new \Page object:
     #
