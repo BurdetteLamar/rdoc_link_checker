@@ -1,0 +1,10 @@
+{
+  "options": {
+    "onsite_only": false,
+    "no_toc": true
+  },
+  "source_file_omits": [
+    "^LEGAL",
+    "^NEWS"
+  ]
+}

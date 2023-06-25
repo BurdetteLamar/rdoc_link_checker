@@ -4,6 +4,7 @@ require 'nokogiri'
 require 'rexml/document'
 require 'find'
 require 'net/http'
+require 'json'
 
 require_relative 'rdoc_link_checker/version'
 
@@ -11,18 +12,38 @@ class RDocLinkChecker
 
   include REXML
 
-  attr_accessor :html_dirpath, :onsite_only, :no_toc
+  attr_accessor :html_dirpath, :config_filepath, :onsite_only, :no_toc,
+                :source_file_omits
 
   attr_accessor :source_paths, :pages
 
   def initialize(
     html_dirpath,
+    config_filepath: nil,
     onsite_only: false,
     no_toc: false
   )
     self.html_dirpath = html_dirpath
+    self.config_filepath = config_filepath
     self.onsite_only = onsite_only
     self.no_toc = no_toc
+    self.source_file_omits = []
+    if config_filepath
+      config = JSON.parse(File.read(config_filepath))
+      options = config['options']
+      if options
+        val = options['onsite_only']
+        self.onsite_only = val if val
+        val = options['no_toc']
+        self.no_toc = val if val
+      end
+      regexp_sources = config['source_file_omits']
+      if regexp_sources
+        regexp_sources.each do |regexp_source|
+          self.source_file_omits.push(Regexp.new(regexp_source))
+        end
+      end
+    end
     self.pages = {}
     @counts = {
       source_pages: 0,
@@ -52,6 +73,11 @@ class RDocLinkChecker
     paths = Find.find('.').select {|path| path.end_with?('.html') }
     # Remove leading './'.
     self.source_paths = paths.map{|path| path.sub(%r[^\./], '')}
+    source_file_omits.each do |re|
+      self.source_paths.delete_if do |source_path|
+        source_path.match(re)
+      end
+    end
     @counts[:source_pages] = source_paths.size
   end
 
