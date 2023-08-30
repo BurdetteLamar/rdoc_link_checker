@@ -16,6 +16,10 @@ def help
   dirname = File.dirname(File.dirname(path))
   filepath = File.join(dirname, 'doc', 'help.txt')
   puts File.read(filepath)
+  filepath = File.join(dirname, 'config', 'ruby.json')
+  File.readlines(filepath).each do |line|
+    puts "    #{line}"
+  end
   exit
 end
 

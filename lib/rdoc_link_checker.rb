@@ -95,7 +95,7 @@ class RDocLinkChecker
       else
         source_page.gather_links(doc)
       end
-      source_page.gather_ids(doc)
+      source_page.gather_link_targets(doc)
     end
   end
 
@@ -122,7 +122,7 @@ class RDocLinkChecker
             if File.readable?(link.path)
               target_text = File.read(link.path)
               doc = Nokogiri::HTML(target_text)
-              target_page.gather_ids(doc)
+              target_page.gather_link_targets(doc)
             elsif RDocLinkChecker.checkable?(link.path)
               link.exception = fetch(link.path, target_page)
               link.valid_p = false if link.exception
@@ -133,7 +133,7 @@ class RDocLinkChecker
           next if target_page.nil?
           if link.has_fragment? && target_page.ids.empty?
             doc || doc = Nokogiri::HTML(target_text)
-            target_page.gather_ids(doc) if target_page.content_type&.match('html')
+            target_page.gather_link_targets(doc) if target_page.content_type&.match('html')
           end
         end
       end
@@ -187,7 +187,7 @@ class RDocLinkChecker
     if !code_bad?(code)
       if content_type_html?(response)
         doc = Nokogiri::HTML(response.body)
-        target_page.gather_ids(doc)
+        target_page.gather_link_targets(doc)
       end
     end
     exception
@@ -555,9 +555,9 @@ EOT
       end
     end
 
-    # Gather ids for the page.
+    # Gather link targets for the page.
     # +doc+ is the Nokogiri document to be parsed.
-    def gather_ids(doc)
+    def gather_link_targets(doc)
       # Don't do twice (some pages are both source and target).
       return unless ids.empty?
 
@@ -566,6 +566,15 @@ EOT
         doc.xpath("//*[@id]").each do |element|
           id = element.attr('id')
           ids.push(id)
+        end
+        doc.xpath("//*[@name]").each do |element|
+          name = element.attr('name')
+          ids.push(name)
+        end
+        doc.xpath("//a[@href]").each do |element|
+          href = element.attr('href')
+          next unless href.start_with?('#')
+          ids.push(href.sub('#', ''))
         end
         return
       end
