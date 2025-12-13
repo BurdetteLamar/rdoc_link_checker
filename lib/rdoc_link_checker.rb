@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'rubygems'
 require 'nokogiri'
 require 'rexml/document'
 require 'find'
@@ -133,7 +134,7 @@ class RDocLinkChecker
           next if target_page.nil?
           if link.has_fragment? && target_page.ids.empty?
             doc || doc = Nokogiri::HTML(target_text)
-            target_page.gather_link_targets(doc) if target_page.content_type&.match('html')
+            target_page.gather_link_targets(doc)
           end
         end
       end
@@ -180,7 +181,7 @@ class RDocLinkChecker
       target_page.code = code
       target_page.content_type = response['Content-Type']
     rescue => x
-      raise unless x.class.name.match(/^(Net|SocketError|IO::TimeoutError|Errno::)/)
+      raise unless x.class.name.match(/^(Net|Socket|IO::TimeoutError|Errno::)/)
       exception = RDocLinkChecker::HttpResponseError.new(url, x)
     end
     # Don't load if bad code, or no response, or if not html.
@@ -254,7 +255,7 @@ EOT
 
     add_summary(body)
     add_broken_links(body)
-    # add_offsite_links(body) unless onsite_only
+    add_offsite_links(body) unless onsite_only
     report_file_path = 'Report.htm' # _Not_ .html.
     doc.write(File.new(report_file_path, 'w'), 2)
   end
@@ -381,18 +382,25 @@ EOT
 
   def add_offsite_links(body)
     h2 = body.add_element(Element.new('h2'))
-    h2.text = 'Off-Site Links by Source Page'
+    count = 0
+    boilerplate = %w[
+      https://validator.w3.org/check/referer
+      https://ruby.github.io/rdoc/
+      http://deveiate.org/projects/Darkfish-RDoc/
+      http://deveiate.org
+    ]
     none = true
     pages.each_pair do |path, page|
       offsite_links = page.links.select do |link|
-        RDocLinkChecker.offsite?(link.href)
+        RDocLinkChecker.offsite?(link.href) && !boilerplate.include?(link.href)
       end
       next if offsite_links.empty?
+      count += offsite_links.size
 
       none = false
       h3 = body.add_element(Element.new('h3'))
       a = Element.new('a')
-      a.text = path
+      a.text = "#{path} (#{offsite_links.size})"
       a.add_attribute('href', path)
       h3.add_element(a)
 
@@ -409,6 +417,7 @@ EOT
         body.add_element(Element.new('p'))
       end
     end
+    h2.text = "Off-Site Links by Source Page (#{count})"
     if none
       p = body.add_element(Element.new('p'))
       p.text = 'None.'
@@ -422,10 +431,10 @@ EOT
     bad: 'data center bad',
   }
 
-  def table2(parent, data, id, title = nil)
+  def table2(parent, data, id = nil, title = nil)
     data = data.dup
     table = parent.add_element(Element.new('table'))
-    table.add_attribute('id', id)
+    table.add_attribute('id', id) if id
     if title
       tr = table.add_element(Element.new('tr)'))
       th = tr.add_element(Element.new('th'))
@@ -563,6 +572,7 @@ EOT
 
       # For off-site, gather all ids, regardless of element.
       if RDocLinkChecker.offsite?(path)
+        ok = path.match('homepages')
         doc.xpath("//*[@id]").each do |element|
           id = element.attr('id')
           ids.push(id)
