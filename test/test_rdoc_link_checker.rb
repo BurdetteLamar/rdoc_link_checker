@@ -84,12 +84,12 @@ class TestRDocLinkChecker < Minitest::Test
 
   def test_parameters_table
     [true, false].each do |onsite_only|
-      [true, false].each do |no_toc|
+      %w[true false].each do |no_toc|
         exp_texts = [
           ['Parameters'],
           ["html_dirpath", "\"test/html\""],
           ['onsite_only', onsite_only.to_s],
-          ['no_toc', no_toc.to_s],
+          ['no_toc', no_toc],
         ]
         doc = run_link_checker('test/html', onsite_only, no_toc)
         table = doc.xpath("//table[@id='parameters']")
@@ -184,7 +184,7 @@ class TestRDocLinkChecker < Minitest::Test
   def run_link_checker(html_dirpath, onsite_only = false, no_toc = false)
     command = "ruby bin/rdoc_link_checker #{html_dirpath}"
     command += ' --onsite_only' if onsite_only
-    command += ' --no_toc' if no_toc
+    command += " --no_toc #{no_toc}"
     system(command)
     report_path = File.join(html_dirpath, 'Report.htm')
     source_text = File.read(report_path)

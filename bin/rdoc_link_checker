@@ -6,7 +6,7 @@ require_relative '../lib/rdoc_link_checker'
 options = GetoptLong.new(
   ['--config', GetoptLong::REQUIRED_ARGUMENT],
   ['--onsite_only', GetoptLong::NO_ARGUMENT],
-  ['--no_toc',      GetoptLong::NO_ARGUMENT],
+  ['--no_toc',      GetoptLong::REQUIRED_ARGUMENT],
   ['--version',     GetoptLong::NO_ARGUMENT],
   ['--help',        GetoptLong::NO_ARGUMENT]
 )
@@ -30,18 +30,18 @@ end
 
 config_filepath = nil
 onsite_only = false
-no_toc = false
+no_toc = true
 options.each do |option, argument|
   case option
   when '--config'
     config_filepath = argument
     onsite_only = false
-    no_toc = false
+    no_toc = true
     break
   when '--onsite_only'
     onsite_only = true
   when '--no_toc'
-    no_toc = true
+    no_toc = argument == 'false' ? false : true
   when '--help'
     help
   when '--version'
