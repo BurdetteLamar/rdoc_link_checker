@@ -83,12 +83,12 @@ class TestRDocLinkChecker < Minitest::Test
   end
 
   def test_parameters_table
-    [true, false].each do |onsite_only|
+    %W[true false].each do |onsite_only|
       %w[true false].each do |no_toc|
         exp_texts = [
           ['Parameters'],
           ["html_dirpath", "\"test/html\""],
-          ['onsite_only', onsite_only.to_s],
+          ['onsite_only', onsite_only],
           ['no_toc', no_toc],
         ]
         doc = run_link_checker('test/html', onsite_only, no_toc)
@@ -183,7 +183,7 @@ class TestRDocLinkChecker < Minitest::Test
 
   def run_link_checker(html_dirpath, onsite_only = false, no_toc = false)
     command = "ruby bin/rdoc_link_checker #{html_dirpath}"
-    command += ' --onsite_only' if onsite_only
+    command += " --onsite_only #{onsite_only}"
     command += " --no_toc #{no_toc}"
     system(command)
     report_path = File.join(html_dirpath, 'Report.htm')
