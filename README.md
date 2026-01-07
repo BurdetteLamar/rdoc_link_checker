@@ -17,12 +17,3 @@ Reports a link as broken if:
 
 See the [help text](doc/help.txt).
 
-<b>Note</b>: An RDoc bug that was fixed recently
-(PR https://github.com/ruby/rdoc/pull/1002)
-caused many (make that many, many) broken links TOC section
-https://docs.ruby-lang.org/en/master/table_of_contents.html#classes.
-Unless you have a recent Ruby version installed (one that has the bug fix),
-the RDocLinkChecker will find and report all those broken links.
-
-<b>Workaround</b>:  Use option <tt>--no_toc</tt>, which suppresses checking
-for those links.

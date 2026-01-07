@@ -4,7 +4,8 @@ require 'getoptlong'
 require_relative '../lib/rdoc_link_checker'
 
 options = GetoptLong.new(
-  ['--config', GetoptLong::REQUIRED_ARGUMENT],
+  ['--ruby_core',   GetoptLong::REQUIRED_ARGUMENT],
+  ['--config',      GetoptLong::REQUIRED_ARGUMENT],
   ['--onsite_only', GetoptLong::REQUIRED_ARGUMENT],
   ['--no_toc',      GetoptLong::REQUIRED_ARGUMENT],
   ['--version',     GetoptLong::NO_ARGUMENT],
@@ -31,8 +32,12 @@ end
 config_filepath = nil
 onsite_only = false
 no_toc = true
+ruby_core = true
 options.each do |option, argument|
   case option
+  when '--ruby_core'
+    ruby_core = argument == 'false' ? false : true
+    break
   when '--config'
     config_filepath = argument
     onsite_only = false
@@ -63,6 +68,7 @@ raise ArgumentError.new(message) if message
 html_dirpath = ARGV[0]
 RDocLinkChecker.new(
   html_dirpath,
+  ruby_core: ruby_core,
   config_filepath: config_filepath,
   onsite_only: onsite_only,
   no_toc: no_toc

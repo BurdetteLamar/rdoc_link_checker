@@ -13,13 +13,19 @@ class RDocLinkChecker
 
   include REXML
 
-  attr_accessor :html_dirpath, :config_filepath, :onsite_only, :no_toc,
+  attr_accessor :html_dirpath, :ruby_core, :config_filepath, :onsite_only, :no_toc,
                 :source_file_omits
 
   attr_accessor :source_paths, :pages
 
+  RUBY_CORE_OMITS = [
+    "^LEGAL",
+    "^NEWS"
+  ]
+
   def initialize(
     html_dirpath,
+    ruby_core: true,
     config_filepath: nil,
     onsite_only: false,
     no_toc: false
@@ -28,7 +34,7 @@ class RDocLinkChecker
     self.config_filepath = config_filepath
     self.onsite_only = onsite_only
     self.no_toc = no_toc
-    self.source_file_omits = []
+    self.source_file_omits = ruby_core ? RUBY_CORE_OMITS : []
     if config_filepath
       config = JSON.parse(File.read(config_filepath))
       options = config['options']
