@@ -572,7 +572,7 @@ EOT
 
       # For off-site, gather all ids, regardless of element.
       if RDocLinkChecker.offsite?(path)
-        ok = path.match('homepages')
+        path.match('homepages')
         doc.xpath("//*[@id]").each do |element|
           id = element.attr('id')
           ids.push(id)
